@@ -28,76 +28,162 @@ DEFAULT_CHECKPOINT = MODEL_CHECKPOINTS[ModelKey(post_trained=False)]
 
 
 # Laparoscopic dataset and dataloader
-example_video_dataset_laparoscopic = L(VideoDataset)(
+video_dataset_laparoscopic = L(VideoDataset)(
     dataset_dir="/home/xum35/datasets/laparoscopic_partial_excision_of_kidney_using_robotic_assistance",
-    num_frames=93,
+    num_frames=100,
     video_size=(704, 1280),
 )
 
 dataloader_train_laparoscopic = L(get_generic_dataloader)(
-    dataset=example_video_dataset_laparoscopic,
-    sampler=L(get_sampler)(dataset=example_video_dataset_laparoscopic),
+    dataset=video_dataset_laparoscopic,
+    sampler=L(get_sampler)(dataset=video_dataset_laparoscopic),
     batch_size=1,
     drop_last=True,
     num_workers=4,
     pin_memory=True,
 )
 
+# LoRA post-training configuration for all modes (text2world, image2world, video2world)
+# Shared configuration parameters
+_lora_defaults = [
+    f"/experiment/{DEFAULT_CHECKPOINT.experiment}",
+    {"override /data_train": "mock"},
+    # {"override /data_val": "mock"},
+    "_self_",
+]
 
-# Video2World training configuration for laparoscopic dataset
-predict2_video2world_training_2b_cosmos_laparoscopic_partial_excision_of_kidney_using_robotic_assistance = dict(
-    defaults=[
-        f"/experiment/{DEFAULT_CHECKPOINT.experiment}",
-        {"override /data_train": "mock"},
-        {"override /data_val": "mock"},
-        "_self_",
-    ],
+_lora_checkpoint_base = dict(
+    # pyrefly: ignore  # missing-attribute
+    load_path=get_checkpoint_path(DEFAULT_CHECKPOINT.s3.uri),
+    load_from_object_store=dict(
+        enabled=False,
+    ),
+    save_to_object_store=dict(
+        enabled=False,
+    ),
+)
+
+_lora_optimizer = dict(
+    lr=2 ** (-14.5),
+    weight_decay=0.001,
+)
+
+_lora_scheduler = dict(
+    f_max=[0.5],
+    f_min=[0.2],
+    warm_up_steps=[2_000],
+    cycle_lengths=[100000],
+)
+
+_lora_trainer = dict(
+    run_validation=False,
+    validation_iter=5,
+    logging_iter=1,
+    max_iter=100,
+    callbacks=dict(
+        heart_beat=dict(
+            save_s3=False,
+        ),
+        iter_speed=dict(
+            hit_thres=200,
+            save_s3=False,
+        ),
+        device_monitor=dict(
+            save_s3=False,
+        ),
+        every_n_sample_reg=dict(
+            every_n=200,
+            save_s3=False,
+        ),
+        every_n_sample_ema=dict(
+            every_n=200,
+            save_s3=False,
+        ),
+        wandb=dict(
+            save_s3=False,
+        ),
+        wandb_10x=dict(
+            save_s3=False,
+        ),
+        dataloader_speed=dict(
+            save_s3=False,
+        ),
+        # validation_draw_sample_reg=L(ValidationDrawSample)(
+        #     n_samples=2,
+        #     is_ema=False,
+        #     save_s3=False,
+        #     do_x0_prediction=False,
+        # ),
+        # validation_draw_sample_ema=L(ValidationDrawSample)(
+        #     n_samples=2,
+        #     is_ema=True,
+        #     save_s3=False,
+        #     do_x0_prediction=False,
+        # ),
+    ),
+)
+
+_lora_model_config = dict(
+    config=dict(
+        # Enable LoRA training
+        use_lora=True,
+        # LoRA configuration parameters
+        lora_rank=32,
+        lora_alpha=32,
+        lora_target_modules="q_proj,k_proj,v_proj,output_proj,mlp.layer1,mlp.layer2",
+        init_lora_weights=True,
+        # Training configuration for all three modes
+        # The model will randomly sample between 0, 1, and 2 conditional frames during training
+        min_num_conditional_frames=0,  # Allow text2world (0 frames)
+        max_num_conditional_frames=2,  # Allow up to video2world (2 frames)
+        # Probability distribution for sampling number of conditional frames
+        # This controls how often each mode is trained:
+        # - 0 frames: text2world (33.3%)
+        # - 1 frame: image2world (33.3%)
+        # - 2 frames: video2world (33.3%)
+        conditional_frames_probs={0: 0.333, 1: 0.333, 2: 0.334},
+        # Optional: set conditional_frame_timestep for better control
+        conditional_frame_timestep=-1.0,  # Default -1 means not effective
+        # Keep the default conditioning strategy
+        conditioning_strategy="frame_replace",
+        denoise_replace_gt_frames=True,
+    ),
+)
+
+_lora_model_parallel = dict(
+    context_parallel_size=1,
+)
+
+# Text format experiment
+# torchrun --nproc_per_node=8 --master_port=12341 -m scripts.train --config=cosmos_predict2/_src/predict2/configs/video2world/config.py -- experiment=predict2_lora_training_2b_cosmos_nemo_assets_txt
+predict2_lora_training_2b_laparoscopic_txt = dict(
+    defaults=_lora_defaults,
     job=dict(
         project="cosmos_predict_v2p5",
-        group="video2world",
-        name="2b_cosmos_laparoscopic_partial_excision_of_kidney_using_robotic_assistance",
+        group="lora",
+        name="2b_laparoscopic_lora",
     ),
-    # Disable uploading reproducible setup to S3 for local runs
-    upload_reproducible_setup=False,
     dataloader_train=dataloader_train_laparoscopic,
     checkpoint=dict(
-        save_iter=2,
-        # pyrefly: ignore  # missing-attribute
-        load_path=get_checkpoint_path(DEFAULT_CHECKPOINT.s3.uri),
-        load_from_object_store=dict(
-            enabled=False,
-        ),
-        save_to_object_store=dict(
-            enabled=False,
-        ),
+        **_lora_checkpoint_base,
+        save_iter=10,
     ),
-    optimizer=dict(
-        lr=2 ** (-14.5),
-        weight_decay=0.001,
-    ),
-    scheduler=dict(
-        f_max=[0.5],
-        f_min=[0.2],
-        warm_up_steps=[2_000],
-        cycle_lengths=[100000],
-    ),
-    trainer=dict(
-        logging_iter=100,
-        max_iter=1000,
-        callbacks=dict(),
-    ),
-    model_parallel=dict(
-        context_parallel_size=1,
-    ),
+    optimizer=_lora_optimizer,
+    scheduler=_lora_scheduler,
+    trainer=_lora_trainer,
+    model=_lora_model_config,
+    model_parallel=_lora_model_parallel,
 )
 
 
 cs = ConfigStore.instance()
 
-# Register the configuration with Hydra ConfigStore
+# Register the configurations with Hydra ConfigStore
 for _item in [
-    predict2_video2world_training_2b_cosmos_laparoscopic_partial_excision_of_kidney_using_robotic_assistance,
+    predict2_lora_training_2b_laparoscopic_txt,
+    # predict2_lora_training_2b_laparoscopic_json,
 ]:
+    # Get the experiment name from the global variable
     experiment_name = [name.lower() for name, value in globals().items() if value is _item][0]  # noqa: RUF015
 
     cs.store(
@@ -106,3 +192,4 @@ for _item in [
         name=experiment_name,
         node=_item,
     )
+    
