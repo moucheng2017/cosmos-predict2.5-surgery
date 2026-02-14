@@ -16,6 +16,7 @@
 from hydra.core.config_store import ConfigStore
 
 from cosmos_predict2._src.imaginaire.lazy_config import LazyCall as L
+from cosmos_predict2._src.predict2.callbacks.validation_draw_sample import ValidationDrawSample
 from cosmos_predict2._src.imaginaire.utils.checkpoint_db import get_checkpoint_path
 from cosmos_predict2._src.predict2.datasets.local_datasets.dataset_video import (
     VideoDataset,
@@ -27,19 +28,35 @@ from cosmos_predict2.config import MODEL_CHECKPOINTS, ModelKey
 DEFAULT_CHECKPOINT = MODEL_CHECKPOINTS[ModelKey(post_trained=False)]
 
 
-# Laparoscopic dataset and dataloader
-video_dataset_laparoscopic = L(VideoDataset)(
-    dataset_dir="/home/xum35/datasets/laparoscopic_partial_excision_of_kidney_using_robotic_assistance",
-    num_frames=40,
+# Laparoscopic dataset and dataloader (training)
+train_video_dataset_laparoscopic = L(VideoDataset)(
+    dataset_dir="/home/xum35/datasets/laparoscopic_partial_excision_of_kidney_using_robotic_assistance/train",
+    num_frames=93,
     video_size=(704, 1280),
 )
 
-dataloader_train_laparoscopic = L(get_generic_dataloader)(
-    dataset=video_dataset_laparoscopic,
-    sampler=L(get_sampler)(dataset=video_dataset_laparoscopic),
+train_dataloader_train_laparoscopic = L(get_generic_dataloader)(
+    dataset=train_video_dataset_laparoscopic,
+    sampler=L(get_sampler)(dataset=train_video_dataset_laparoscopic),
     batch_size=1,
     drop_last=True,
-    num_workers=4,
+    num_workers=8,
+    pin_memory=True,
+)
+
+# Laparoscopic dataset and dataloader (validation)
+val_video_dataset_laparoscopic = L(VideoDataset)(
+    dataset_dir="/home/xum35/datasets/laparoscopic_partial_excision_of_kidney_using_robotic_assistance/val",
+    num_frames=93,
+    video_size=(704, 1280),
+)
+
+val_dataloader_val_laparoscopic = L(get_generic_dataloader)(
+    dataset=val_video_dataset_laparoscopic,
+    sampler=L(get_sampler)(dataset=val_video_dataset_laparoscopic),
+    batch_size=1,
+    drop_last=True,
+    num_workers=8,
     pin_memory=True,
 )
 
@@ -48,7 +65,7 @@ dataloader_train_laparoscopic = L(get_generic_dataloader)(
 _lora_defaults = [
     f"/experiment/{DEFAULT_CHECKPOINT.experiment}",
     {"override /data_train": "mock"},
-    # {"override /data_val": "mock"},
+    {"override /data_val": "mock"},
     "_self_",
 ]
 
@@ -78,8 +95,8 @@ _lora_scheduler = dict(
 _lora_trainer = dict(
     run_validation=False,
     validation_iter=5,
-    logging_iter=1,
-    max_iter=100,
+    logging_iter=5,
+    max_iter=1200,
     callbacks=dict(
         heart_beat=dict(
             save_s3=False,
@@ -109,16 +126,18 @@ _lora_trainer = dict(
             save_s3=False,
         ),
         # validation_draw_sample_reg=L(ValidationDrawSample)(
-        #     n_samples=2,
+        #     n_samples=1,
         #     is_ema=False,
         #     save_s3=False,
         #     do_x0_prediction=False,
+        #     fps=10
         # ),
         # validation_draw_sample_ema=L(ValidationDrawSample)(
-        #     n_samples=2,
+        #     n_samples=1,
         #     is_ema=True,
         #     save_s3=False,
         #     do_x0_prediction=False,
+        #     fps=10
         # ),
     ),
 )
@@ -134,7 +153,7 @@ _lora_model_config = dict(
         init_lora_weights=True,
         # Training configuration for all three modes
         # The model will randomly sample between 0, 1, and 2 conditional frames during training
-        min_num_conditional_frames=0,  # Allow text2world (0 frames)
+        min_num_conditional_frames=1,  # Allow text2world (0 frames)
         max_num_conditional_frames=2,  # Allow up to video2world (2 frames)
         # Probability distribution for sampling number of conditional frames
         # This controls how often each mode is trained:
@@ -161,12 +180,13 @@ predict2_lora_training_2b_laparoscopic_txt = dict(
     job=dict(
         project="cosmos_predict_v2p5",
         group="lora",
-        name="2b_laparoscopic_lora",
+        name="2b_laparoscopic_lora_txt_1200iter_93frames",
     ),
-    dataloader_train=dataloader_train_laparoscopic,
+    dataloader_train=train_dataloader_train_laparoscopic,
+    dataloader_val=val_dataloader_val_laparoscopic,
     checkpoint=dict(
         **_lora_checkpoint_base,
-        save_iter=10,
+        save_iter=50,
     ),
     optimizer=_lora_optimizer,
     scheduler=_lora_scheduler,

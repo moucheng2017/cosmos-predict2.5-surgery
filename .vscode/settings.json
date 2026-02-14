@@ -1,5 +1,13 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "python.languageServer": "Pylance",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.indexing": true,
+    "python.analysis.autoImportCompletions": true,
+    "editor.semanticHighlighting.enabled": true,
+    "[python]": {
+        "editor.semanticHighlighting.enabled": true
+    }
 }

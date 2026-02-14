@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Train (torchrun)",
+      "type": "python",
+      "request": "launch",
+      "module": "torch.distributed.run",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--nproc_per_node=2",
+        "-m",
+        "scripts.train",
+        "--config=cosmos_predict2/_src/predict2/configs/video2world/config.py",
+        "--",
+        "experiment=predict2_lora_training_2b_laparoscopic_txt"
+      ],
+      "env": {
+        "TOKENIZERS_PARALLELISM": "false",
+        "TORCH_DISTRIBUTED_DEBUG": "DETAIL",
+        "NCCL_DEBUG": "INFO"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Train (single process)",
+      "type": "python",
+      "request": "launch",
+      "module": "scripts.train",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--config=cosmos_predict2/_src/predict2/configs/video2world/config.py",
+        "--",
+        "experiment=predict2_lora_training_2b_laparoscopic_txt"
+      ],
+      "env": {
+        "TOKENIZERS_PARALLELISM": "false"
+      },
+      "justMyCode": false
+    }
+  ]
+}
