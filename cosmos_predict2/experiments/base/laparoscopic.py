@@ -30,7 +30,7 @@ DEFAULT_CHECKPOINT = MODEL_CHECKPOINTS[ModelKey(post_trained=False)]
 # Laparoscopic dataset and dataloader
 video_dataset_laparoscopic = L(VideoDataset)(
     dataset_dir="/home/xum35/datasets/laparoscopic_partial_excision_of_kidney_using_robotic_assistance",
-    num_frames=100,
+    num_frames=40,
     video_size=(704, 1280),
 )
 
