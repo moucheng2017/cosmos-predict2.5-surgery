@@ -20,6 +20,6 @@ export CUDA_VISIBLE_DEVICES=4,5,6,7
 
 torchrun --nproc_per_node=4 --master_port=29501 examples/inference.py \
   -i assets/laparoscopic_val_prompts.jsonl \
-  -o outputs/laparoscopic_video2world \
+  -o /home/xum35/results/cosmos_predict2/surgery/cosmos_predict_v2p5/lora/2b_laparoscopic_lora_txt_1200iter_93frames/Inference/200/outputs/laparoscopic_video2world \
   --checkpoint-path $CHECKPOINT_DIR/model_ema_bf16.pt \
   --experiment predict2_lora_training_2b_laparoscopic_txt

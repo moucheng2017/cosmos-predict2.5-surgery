@@ -1,2 +1,0 @@
-[02-15 18:23:15|INFO|cosmos_predict2/_src/imaginaire/utils/checkpoint_db.py:181:path] Downloading checkpoint nvidia/Cosmos-Guardrail1(9c7b7da4-2d95-45bb-9cb8-2eed954e9736)
-[02-15 18:23:15|INFO|cosmos_predict2/_src/imaginaire/utils/checkpoint_db.py:134:_download] Downloading checkpoint from Hugging Face with {'repo_id': 'nvidia/Cosmos-Guardrail1', 'repo_type': 'model', 'revision': 'd6d4bfa899a71454a700907664f3e88f503950cf', 'allow_patterns': ['*']}
